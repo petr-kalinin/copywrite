@@ -41,15 +41,20 @@ def compare(sol1, sol2):
         ans[i][0] = 0
     for j in range(len(s2)+1):
         ans[0][j] = 0
+    length = max(len(s1), len(s2))
+    eps = max(length // 100, 2)
     for i in range(1, len(s1)+1):
         for j in range(1, len(s2)+1):
             if s1[i-1] == s2[j-1]:
                 ans[i][j] = ans[i-1][j-1] + 1
             else:
                 ans[i][j] = max(ans[i-1][j], ans[i][j-1])
+        j = i
+        if j > len(s2):
+            j = len(s2)
+        if ans[i][j] < i - 3 * eps:
+            return False
     finalAns = ans[len(s1)][len(s2)]
-    length = max(len(s1), len(s2))
-    eps = max(length // 100, 2)
     return finalAns >= length - eps
 
 def add_to_graph(gr, a, b, prob):
@@ -60,14 +65,20 @@ def add_to_graph(gr, a, b, prob):
     if prob in gr[a][b][1]:
         return
     gr[a][b][0] += 1
-    gr[a][b][1].append(prob)
+    #gr[a][b][1].append(prob)
 
 def process_problem(problem, graph):
     sols = list(SolutionList(problem))
+    res = []
     for sol1, sol2 in itertools.combinations(sols, 2):
         if (sol1.author != sol2.author) and compare(sol1, sol2):
             add_to_graph(graph, sol1.author, sol2.author, problem)
             add_to_graph(graph, sol2.author, sol1.author, problem)
+            res.append((sol1.filename, sol2.filename))
+    with open("list.txt","a") as f:
+        f.write(problem + "\n")
+        for r in res:
+            f.write(str(r) + "\n")
             
 def generate_output(gr):
     nodes = set()
@@ -80,13 +91,14 @@ def generate_output(gr):
     for v in nodes:
         nodesNum[v] = num
         num += 1
-    print("nodedef>name VARCHAR,label VARCHAR")
-    for v in nodesNum.keys():
-        print("v%d, %s" % (nodesNum[v], v))
-    print("edgedef>node1 VARCHAR,node2 VARCHAR, weight DOUBLE")
-    for v in gr.keys():
-        for u in gr[v].keys():
-            print("v%d,v%d,%d" % (nodesNum[v], nodesNum[u], gr[v][u][0]))
+    with open("res.gdf","w",encoding="latin-1") as f:
+        f.write("nodedef>name VARCHAR,label VARCHAR\n")
+        for v in nodesNum.keys():
+            f.write("v%d, %s\n" % (nodesNum[v], v))
+        f.write("edgedef>node1 VARCHAR,node2 VARCHAR, weight DOUBLE\n")
+        for v in gr.keys():
+            for u in gr[v].keys():
+                f.write("v%d,v%d,%d\n" % (nodesNum[v], nodesNum[u], gr[v][u][0]))
 
 #--------------------
 
@@ -96,9 +108,5 @@ problems = list(ProblemList('data'))
 for f in problems:
     print(">",f,processedNum,"/", len(problems))
     processedNum += 1
-    try:
-        process_problem(f, graph)
-    except KeyboardInterrupt:
-        break
-
-generate_output(graph)
+    process_problem(f, graph)
+    generate_output(graph)
