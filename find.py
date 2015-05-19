@@ -31,31 +31,76 @@ class Solution:
     def __str__(self):
         return self.author + ": " + str(self.tokens)
 
-def compare(sol1, sol2):
-    ans = {}
-    s1 = sol1.code
-    s2 = sol2.code
-    print(sol1.filename+ " " + sol2.filename, len(s1), len(s2))
-    for i in range(len(s1)+1):
-        ans[i] = {}
-        ans[i][0] = 0
-    for j in range(len(s2)+1):
-        ans[0][j] = 0
-    length = max(len(s1), len(s2))
-    eps = max(length // 100, 2)
-    for i in range(1, len(s1)+1):
-        for j in range(1, len(s2)+1):
-            if s1[i-1] == s2[j-1]:
-                ans[i][j] = ans[i-1][j-1] + 1
-            else:
-                ans[i][j] = max(ans[i-1][j], ans[i][j-1])
-        j = i
-        if j > len(s2):
-            j = len(s2)
-        if ans[i][j] < i - 3 * eps:
-            return False
-    finalAns = ans[len(s1)][len(s2)]
-    return finalAns >= length - eps
+class Comparator:
+    cache = {}
+    
+    def __init__(self, cacheFile):
+        self.loadCache(cacheFile)
+        self.cacheFile = open(cacheFile, "w")
+        
+    def loadCache(self, cacheFile):
+        self.cache = {}
+        if not os.path.isfile(cacheFile):
+            return
+        lines = open(cacheFile).readlines()
+        for line in lines:
+            (sol1, sol2, res) = line.split()
+            res = (res == str(True))
+            self.cache[sol1 + ":" + sol2] = res
+            print("Restored from cache: ", sol1, sol2, res, res)
+            
+    def writeToCache(self, sol1, sol2, res):
+        self.cacheFile.write(sol1.filename + " " + sol2.filename + " " + str(res)+"\n")
+        self.cacheFile.flush()
+        
+        
+    def compare(self, sol1, sol2):
+        key = sol1.filename + ":" + sol2.filename
+        #print("check key: " + key)
+        if key in self.cache.keys():
+            res = self.cache[key]
+            self.writeToCache(sol1, sol2, res)
+            print("Cache match: ", sol1.filename, sol2.filename, res)
+            return res
+        ans = {}
+        s1 = sol1.code
+        s2 = sol2.code
+        #print(sol1.filename+ " " + sol2.filename, len(s1), len(s2))
+        for i in range(len(s1)+1):
+            ans[i] = {}
+            ans[i][0] = 0
+        for j in range(len(s2)+1):
+            ans[0][j] = 0
+        length = max(len(s1), len(s2))
+        eps = max(length // 30, 3)
+        earlyFail = False
+        if (length < 120) or (length > 5000):
+            if (length > 5000) and (length < 20000):
+                print("Intermediate length!", sol1.filename, sol2.filename)
+            earlyFail = True
+        else:
+            for i in range(1, len(s1)+1):
+                for j in range(1, len(s2)+1):
+                    if s1[i-1] == s2[j-1]:
+                        ans[i][j] = ans[i-1][j-1] + 1
+                    else:
+                        ans[i][j] = max(ans[i-1][j], ans[i][j-1])
+                j = i
+                if j > len(s2):
+                    j = len(s2)
+                if ans[i][j] < i - 3 * eps:
+                    earlyFail = True
+                    break
+        if not earlyFail:
+            finalAns = ans[len(s1)][len(s2)]
+        else:
+            finalAns = -eps*2
+        res = (not earlyFail) and (finalAns >= length - eps)
+        if res:
+            print("Match: ", sol1.filename, sol2.filename, ans[len(s1)][len(s2)], length)
+        self.cache[key] = res
+        self.writeToCache(sol1, sol2, res)
+        return res
 
 def add_to_graph(gr, a, b, prob):
     if not a in gr.keys():
@@ -65,13 +110,13 @@ def add_to_graph(gr, a, b, prob):
     if prob in gr[a][b][1]:
         return
     gr[a][b][0] += 1
-    #gr[a][b][1].append(prob)
+    gr[a][b][1].append(prob)
 
-def process_problem(problem, graph):
+def process_problem(problem, graph, comparator):
     sols = list(SolutionList(problem))
     res = []
     for sol1, sol2 in itertools.combinations(sols, 2):
-        if (sol1.author != sol2.author) and compare(sol1, sol2):
+        if (sol1.author != sol2.author) and comparator.compare(sol1, sol2):
             add_to_graph(graph, sol1.author, sol2.author, problem)
             add_to_graph(graph, sol2.author, sol1.author, problem)
             res.append((sol1.filename, sol2.filename))
@@ -105,8 +150,9 @@ def generate_output(gr):
 graph = {}
 processedNum = 0
 problems = list(ProblemList('data'))
+comparator = Comparator("cache.txt")
 for f in problems:
     print(">",f,processedNum,"/", len(problems))
     processedNum += 1
-    process_problem(f, graph)
+    process_problem(f, graph, comparator)
     generate_output(graph)
