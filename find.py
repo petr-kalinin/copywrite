@@ -143,7 +143,8 @@ def generate_output(gr):
         f.write("edgedef>node1 VARCHAR,node2 VARCHAR, weight DOUBLE\n")
         for v in gr.keys():
             for u in gr[v].keys():
-                f.write("v%d,v%d,%d\n" % (nodesNum[v], nodesNum[u], gr[v][u][0]))
+                if gr[v][u][0]>2:
+                    f.write("v%d,v%d,%d\n" % (nodesNum[v], nodesNum[u], gr[v][u][0]))
 
 #--------------------
 
