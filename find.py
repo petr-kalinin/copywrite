@@ -23,9 +23,11 @@ class SolutionList:
 class Solution:
     def __init__(self, filename):
         self.filename = filename
+        filenameParts = filename.split("-")
+        self.author = filenameParts[2]
+        #print(self.author)
         lines = open(filename,encoding="latin-1").readlines()
-        self.author = lines[0].strip()
-        self.code = " ".join(lines[1:])
+        self.code = " ".join(lines)
         self.tokens = self.code.split()
 
     def __str__(self):
@@ -115,7 +117,12 @@ def add_to_graph(gr, a, b, prob):
 def process_problem(problem, graph, comparator):
     sols = list(SolutionList(problem))
     res = []
-    for sol1, sol2 in itertools.combinations(sols, 2):
+    allPairs = list(itertools.combinations(sols, 2))
+    total = 0
+    for sol1, sol2 in allPairs:
+        total += 1
+        if (total % 1023 == 0):
+            print(problem, total, "/", len(allPairs))
         if (sol1.author != sol2.author) and comparator.compare(sol1, sol2):
             add_to_graph(graph, sol1.author, sol2.author, problem)
             add_to_graph(graph, sol2.author, sol1.author, problem)
